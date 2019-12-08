@@ -2,30 +2,34 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const morgan = require('morgan');
-const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
+const {port, jwtSecret} = require('./config');
+const jwt = require('jsonwebtoken');
 
 require('./models');
 
 const app = express();
-const port = 4000;
 
 app.use(express.static('public'));
 app.use(morgan('combined'));
-app.use(cors());
+app.use(cors({
+	origin: true,
+	credentials: true
+}));
 app.use(cookieParser());
 app.use(bodyParser.json());
+app.use(function(req, res, next) {
+	if (req.cookies.user) {
+		try {
+			req.user = jwt.verify(req.cookies.user, jwtSecret).data;
+		} catch(e) {
+			res.cookie('user', '');
+			res.status(403).json({message: `user not authorized`}).end();
+		}
 
-app.use(function (req, res, next) {
-	const User = mongoose.model('User');
-
-	User.findOne({
-		user: req.headers.user,
-		password: req.headers.password
-	})
-		.then(user => req.user = user)
-		.then(() => next())
-		.catch(() => res.status(400).end());
+		console.log(req.user)
+	}
+	next();
 });
 
 require('./routes/users')(app);
